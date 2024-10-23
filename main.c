@@ -23,7 +23,6 @@
 /* USER CODE BEGIN Includes */
 #include <stdio.h>
 #include <string.h>
-#include "utils.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -58,11 +57,11 @@ UART_HandleTypeDef huart2;
 #define TRIG_PORT GPIOA
 #define ECHO_PIN GPIO_PIN_8
 #define ECHO_PORT GPIOA
+// Initialize variables for the radar
 uint32_t pMillis;
 uint32_t Value1 = 0;
 uint32_t Value2 = 0;
-uint16_t Distance = 0; //cm
-char strCopy[15];
+uint16_t Distance = 0; 
 
 
 /* USER CODE END PV */
@@ -88,7 +87,8 @@ int __io_putchar(int ch)
   return ch;
 }
 
-
+// I couldn't configure the ioc file properly with DMAs, so I'm gonna just manually initialise those each time, here's the functions to do so :
+// note: they're copied, slightly modified and pasted from lines 382-409 down this file
 void ADC_Select_CH1(void){
 	/** Configure Regular Channel
 	  */
@@ -134,12 +134,7 @@ void ADC_Select_CH3(void){
 		  }
 }
 
-uint16_t ADC_VAL[3];
-
-MotorState motorState = MOTOR_STOPPED; // État initial
-
-//int count_50ms = 0 ;
-
+uint16_t ADC_VAL[3]; // Array that stores values of those three line traking sensors 
 
 /* USER CODE END 0 */
 
@@ -180,12 +175,12 @@ int main(void)
   /* USER CODE BEGIN 2 */
   HAL_TIM_Base_Start(&htim1);
   HAL_GPIO_WritePin(TRIG_PORT, TRIG_PIN, GPIO_PIN_RESET); //pull the TRIG pin low
-  HAL_ADCEx_Calibration_Start(&hadc1, ADC_SINGLE_ENDED); //fonction qui permet de calibrer les capteurs
+  HAL_ADCEx_Calibration_Start(&hadc1, ADC_SINGLE_ENDED); //for sensors calibration
 
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_3); //PB10 TIM2 CH3
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_4); //PB11 TIM2 CH4
 
-  int threshold = 500;
+  int threshold = 500;  //the threshold for line tracking
   //Stop the motor
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, 0);
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, 0);
@@ -195,53 +190,27 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-//  HAL_TIM_Base_Start_IT(&htim17);
+
   while (1)
   {
-//	  if(count_50ms<0){count_50ms++;}
-//	  if(count_50ms > 1){count_50ms--;}
-//	  if (count_50ms==1){ //The CallBack function on TIM17 has a period of 20ms, just like TIM1, so we check every 60ms
-//		  HAL_GPIO_WritePin(TRIG_PORT, TRIG_PIN, GPIO_PIN_SET);  // pull the TRIG pin HIGH
-//		  __HAL_TIM_SET_COUNTER(&htim1, 0);
-//		  while (__HAL_TIM_GET_COUNTER (&htim1) < 10);  // wait for 10 us
-//		  HAL_GPIO_WritePin(TRIG_PORT, TRIG_PIN, GPIO_PIN_RESET);  // pull the TRIG pin low
-//
-//		  pMillis = HAL_GetTick(); // used this to avoid infinite while loop  (for timeout)
-//		  	      // wait for the echo pin to go high
-//		  while (!(HAL_GPIO_ReadPin (ECHO_PORT, ECHO_PIN)) && pMillis + 10 >  HAL_GetTick());
-//		  Value1 = __HAL_TIM_GET_COUNTER (&htim1);
-//
-//		  pMillis = HAL_GetTick(); // used this to avoid infinite while loop (for timeout)
-//		  	      // wait for the echo pin to go low
-//		  while ((HAL_GPIO_ReadPin (ECHO_PORT, ECHO_PIN)) && pMillis + 50 > HAL_GetTick());
-//		  Value2 = __HAL_TIM_GET_COUNTER (&htim1);
-//
-//		  Distance = (Value2-Value1)* 0.034/2;
-//		  printf( "Distance = %d cm\r\n", (int)Distance);
-//		  count_50ms=0;
-//	  }
 	  // The code for the radar, it prints the distance
 	  HAL_GPIO_WritePin(TRIG_PORT, TRIG_PIN, GPIO_PIN_SET);  // pull the TRIG pin HIGH
 	  __HAL_TIM_SET_COUNTER(&htim1, 0);
 	  while (__HAL_TIM_GET_COUNTER (&htim1) < 10);  // wait for 10 us
 	  HAL_GPIO_WritePin(TRIG_PORT, TRIG_PIN, GPIO_PIN_RESET);  // pull the TRIG pin low
 
-	  pMillis = HAL_GetTick(); // used this to avoid infinite while loop  (for timeout)
-	  	      // wait for the echo pin to go high
-	  while (!(HAL_GPIO_ReadPin (ECHO_PORT, ECHO_PIN)) && pMillis + 10 >  HAL_GetTick());
+	  pMillis = HAL_GetTick(); // to avoid infinite while loop 
+	  while (!(HAL_GPIO_ReadPin (ECHO_PORT, ECHO_PIN)) && pMillis + 10 >  HAL_GetTick());// wait for the echo pin to go high
 	  Value1 = __HAL_TIM_GET_COUNTER (&htim1);
 
-	  pMillis = HAL_GetTick(); // used this to avoid infinite while loop (for timeout)
-	  	      // wait for the echo pin to go low
-	  while ((HAL_GPIO_ReadPin (ECHO_PORT, ECHO_PIN)) && pMillis + 50 > HAL_GetTick());
-	  Value2 = __HAL_TIM_GET_COUNTER (&htim1);
+	  pMillis = HAL_GetTick();
+	  while ((HAL_GPIO_ReadPin (ECHO_PORT, ECHO_PIN)) && pMillis + 50 > HAL_GetTick()); // wait for the echo pin to go low
+    Value2 = __HAL_TIM_GET_COUNTER (&htim1);
 
 	  Distance = (Value2-Value1)* 0.034/2;
-	  printf( "Distance = %d cm\r\n", (int)Distance);
-
+	  //printf( "Distance = %d cm\r\n", (int)Distance);
 
 	  //Lign tracker part
-
 	  ADC_Select_CH1();
 	  HAL_ADC_Start(&hadc1);
 	  HAL_ADC_PollForConversion(&hadc1, 1000);
@@ -259,9 +228,7 @@ int main(void)
 	  HAL_ADC_PollForConversion(&hadc1, 1000);
 	  ADC_VAL[2] = HAL_ADC_GetValue(&hadc1);
 	  HAL_ADC_Stop(&hadc1);
-
-	  printf("Left : %d, Mid: %d, Right: %d \r\n", ADC_VAL[0], ADC_VAL[1], ADC_VAL[2]);
-
+	  //printf("Left : %d, Mid: %d, Right: %d \r\n", ADC_VAL[0], ADC_VAL[1], ADC_VAL[2]);
 
 	  if(((ADC_VAL[0]<threshold) &&(ADC_VAL[1]>threshold) && (ADC_VAL[2]<threshold))&&(Distance>10)){
 		  //Set the rotation direction forward
@@ -269,7 +236,7 @@ int main(void)
 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, 0);
 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, 1);
 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_9, 0);
-		  // Set the speed slow
+		  // Set the speed 
 		  __HAL_TIM_SET_COMPARE(&htim2,TIM_CHANNEL_3, 1000);
 		  __HAL_TIM_SET_COMPARE(&htim2,TIM_CHANNEL_4, 1000);
 	  }else if((ADC_VAL[0]>threshold)&&(Distance>10)){
@@ -279,7 +246,7 @@ int main(void)
 		  //right motor rotate foward
 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, 1);
 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_9, 0);
-		  // Set the speed slow
+		  // Set the speed 
 		  __HAL_TIM_SET_COMPARE(&htim2,TIM_CHANNEL_4, 1000);
 	  }else if((ADC_VAL[2]>threshold)&&(Distance>10)){
 		  //left motor rotate foward
@@ -288,58 +255,17 @@ int main(void)
 		  //Stop the right motor
 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, 0);
 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_9, 0);
-		  // Set the speed slow
+		  // Set the speed 
 		  __HAL_TIM_SET_COMPARE(&htim2,TIM_CHANNEL_3, 1000);
 	  }else{
-		  //Stop the left motor
+		  //Stop both motors
 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, 0);
 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, 0);
-		  //Stop the right motor
 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, 0);
 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_9, 0);
 	  }
-
-	  HAL_Delay(50);
-//	  	  // Set the rotation direction backward
-//	  	      HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, 0);
-//	  	      HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, 1);
-//	  	      HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, 0);
-//	  	      HAL_GPIO_WritePin(GPIOB, GPIO_PIN_9, 1);
-//	  	      // Set the speed slow
-//	  	      __HAL_TIM_SET_COMPARE(&htim2,TIM_CHANNEL_3, 1000);
-//	  	      __HAL_TIM_SET_COMPARE(&htim2,TIM_CHANNEL_4, 1000);
-//	  	      HAL_Delay(2000);
-//	  	      // Set the speed medium
-//	  	      __HAL_TIM_SET_COMPARE(&htim2,TIM_CHANNEL_3, 1500);
-//	  	      __HAL_TIM_SET_COMPARE(&htim2,TIM_CHANNEL_4, 1500);
-//	  	      HAL_Delay(2000);
-//
-//	  	      // Stop the motor
-//	  	      HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, 0);
-//	  	      HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, 0);
-//	  	      HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, 0);
-//	  	      HAL_GPIO_WritePin(GPIOB, GPIO_PIN_9, 0);
-//	  	      HAL_Delay(2000);
-//	  	      // Set the rotation direction forward
-//	  	      HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, 1);
-//	  	      HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, 0);
-//	  	      HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, 1);
-//	  	      HAL_GPIO_WritePin(GPIOB, GPIO_PIN_9, 0);
-//	  	      // Set the speed slow
-//	  	      __HAL_TIM_SET_COMPARE(&htim2,TIM_CHANNEL_3, 1000);
-//	  	      __HAL_TIM_SET_COMPARE(&htim2,TIM_CHANNEL_4, 1000);
-//	  	      HAL_Delay(2000);
-//	  	      // Set the speed medium
-//	  	      __HAL_TIM_SET_COMPARE(&htim2,TIM_CHANNEL_3, 1500);
-//	  	      __HAL_TIM_SET_COMPARE(&htim2,TIM_CHANNEL_4, 1500);
-//	  	      HAL_Delay(2000);
-//
-//	  	      // Stop the motor
-//	  	      HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, 0);
-//	  	      HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, 0);
-//	  	      HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, 0);
-//	  	      HAL_GPIO_WritePin(GPIOB, GPIO_PIN_9, 0);
-//	  	      HAL_Delay(2000);
+	  HAL_Delay(50); //If I don't add this the detection with ultrasound might cause pb with relatively long ditances
+    // The sound needs time to travel, here each iteration is 20ms, might be too quick, so HAL_Delay here works just fine.
 
     /* USER CODE END WHILE */
 
@@ -719,13 +645,7 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-//void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
-//{
-//	//printf("HAL \r\n");
-//
-//	count_50ms ++;
-//
-//}
+
 /* USER CODE END 4 */
 
 /**
